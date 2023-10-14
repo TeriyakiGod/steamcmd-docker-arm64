@@ -1,5 +1,5 @@
-# Use the official Ubuntu 20.04 as the base image
-FROM ubuntu:latest
+# Use the official Ubuntu 22.04 as the base image
+FROM ubuntu:22.04
 
 # Set environment variables to avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -66,11 +66,16 @@ USER steam
 WORKDIR /home/steam/.fex-emu/RootFS/
 
 # Set up rootfs
-COPY Ubuntu_22_04 ./Ubuntu_22_04
 
-#WORKDIR /home/steam/.fex-emu
+COPY Ubuntu_22_04.tar.gz ./
 
-RUN echo '{"Config":{"RootFS":"Ubuntu_22_04"}}' > ../Config.json
+RUN tar xzf Ubuntu_22_04.tar.gz
+
+RUN rm ./Ubuntu_22_04.tar.gz
+
+WORKDIR /home/steam/.fex-emu
+
+RUN echo '{"Config":{"RootFS":"Ubuntu_22_04"}}' > ./Config.json
 
 WORKDIR /home/steam/Steam
 
