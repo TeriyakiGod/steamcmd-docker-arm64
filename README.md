@@ -56,6 +56,8 @@ Once you've built the Docker image, you can run the SteamCMD container using the
 
 4. To exit the container when you're done, simply type `exit`.
 
+5. If you need to make modifications to the container the root password is: `steamcmd`.
+
 ## Additional Information
 
 - [SteamCMD Documentation](https://developer.valvesoftware.com/wiki/SteamCMD)
