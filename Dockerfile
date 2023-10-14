@@ -61,13 +61,19 @@ RUN sudo ninja install && \
 
 RUN sudo useradd -m -s /bin/bash steam
 
+RUN sudo apt install wget
+
+USER root
+
+RUN echo 'root:steamcmd' | chpasswd
+
 USER steam
 
 WORKDIR /home/steam/.fex-emu/RootFS/
 
 # Set up rootfs
 
-COPY Ubuntu_22_04.tar.gz ./
+RUN wget -O Ubuntu_22_04.tar.gz https://www.dropbox.com/scl/fi/16mhn3jrwvzapdw50gt20/Ubuntu_22_04.tar.gz?rlkey=4m256iahwtcijkpzcv8abn7nf
 
 RUN tar xzf Ubuntu_22_04.tar.gz
 
