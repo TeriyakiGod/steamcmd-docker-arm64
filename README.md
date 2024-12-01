@@ -16,7 +16,7 @@ To build the Docker image, follow these steps:
 1. Clone this repository to your local machine:
 
    ```bash
-   git clone https://github.com/your-username/steamcmd-docker-arm64.git
+   git clone https://github.com/TeriyakiGod/steamcmd-docker-arm64.git
    ```
 
 2. Navigate to the repository's directory:
@@ -28,7 +28,7 @@ To build the Docker image, follow these steps:
 3. Build the Docker image using the provided `Dockerfile`:
 
    ```bash
-   docker build -t steamcmd-arm64 .
+   sudo docker build -t steamcmd-arm64 .
    ```
 
    This command will build the Docker image named "steamcmd-arm64."
@@ -48,15 +48,15 @@ Once you've built the Docker image, you can run the SteamCMD container using the
 
 3. You can now use SteamCMD within the container to install and manage game servers. For example:
 
+  
+    `Steam>`
    ```bash
-   Steam> +login your_steam_username your_steam_password
+   +login anonymous
    ```
 
-   Replace `your_steam_username` and `your_steam_password` with your actual Steam credentials.
+3. To exit the container when you're done, simply type `exit`.
 
-4. To exit the container when you're done, simply type `exit`.
-
-5. If you need to make modifications to the container the root password is: `steamcmd`.
+4. If you need to make modifications to the container the root password is: `steamcmd`.
 
 ## Additional Information
 
