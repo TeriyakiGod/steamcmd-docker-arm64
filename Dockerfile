@@ -32,7 +32,11 @@ RUN apt-get update && \
     expect \
     curl \
     sudo \
-    fuse
+    fuse \
+    qtdeclarative5-dev \
+    qml-module-qtquick-controls \
+    qml-module-qtquick-controls2 \
+    qml-module-qtquick-dialogs
 
 # Create a new user and set their home directory
 RUN useradd -m -s /bin/bash fex
@@ -46,7 +50,7 @@ USER fex
 WORKDIR /home/fex
 
 # Clone the FEX repository and build it
-RUN git clone --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
+RUN git clone --depth 1 --branch FEX-2412 --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
     cd FEX && \
     mkdir Build && \
     cd Build && \
@@ -73,15 +77,11 @@ WORKDIR /home/steam/.fex-emu/RootFS/
 
 # Set up rootfs
 
-RUN wget -O Ubuntu_22_04.tar.gz https://www.dropbox.com/scl/fi/16mhn3jrwvzapdw50gt20/Ubuntu_22_04.tar.gz?rlkey=4m256iahwtcijkpzcv8abn7nf
-
-RUN tar xzf Ubuntu_22_04.tar.gz
-
-RUN rm ./Ubuntu_22_04.tar.gz
+RUN wget -O Ubuntu_22_04.tar.gz https://rootfs.fex-emu.gg/Ubuntu_22_04/2024-05-27/Ubuntu_22_04.sqsh
 
 WORKDIR /home/steam/.fex-emu
 
-RUN echo '{"Config":{"RootFS":"Ubuntu_22_04"}}' > ./Config.json
+RUN echo '{"Config":{"RootFS":"Ubuntu_22_04.sqsh"}}' > ./Config.json
 
 WORKDIR /home/steam/Steam
 
