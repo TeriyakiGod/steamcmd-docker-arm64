@@ -1,91 +1,74 @@
-# Use the official Ubuntu 22.04 as the base image
-FROM ubuntu:22.04
+# syntax=docker/dockerfile:1
+#
+# SteamCMD for arm64, running the x86 SteamCMD client through the FEX emulator.
+#
+# Nothing is compiled: FEX comes from the official FEX PPA and the x86 root
+# filesystem from rootfs.fex-emu.gg, both verified while building.
 
-# Set environment variables to avoid interactive prompts
+ARG UBUNTU_VERSION=24.04
+
+# ---------------------------------------------------------------------------
+# fetch: downloads and unpacks everything. Runs on the build machine's own
+# architecture, so cross-building from x86_64 doesn't emulate this work.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION} AS fetch
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG FEX_VERSION=latest
+ARG ROOTFS_URL=https://rootfs.fex-emu.gg/Ubuntu_24_04/2026-08-11/Ubuntu_24_04.sqsh
+ARG ROOTFS_SHA256=2854b06d3ff1b8f6e526135bfb6dd5b7b30ab3ab73e79ae933a3d9fed959a178
+ARG STEAMCMD_URL=https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg squashfs-tools \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY docker/fetch-fex.sh /usr/local/bin/fetch-fex.sh
+RUN fetch-fex.sh /out "$FEX_VERSION"
+
+RUN curl -fsSL "$ROOTFS_URL" -o /tmp/rootfs.sqsh \
+ && echo "$ROOTFS_SHA256  /tmp/rootfs.sqsh" | sha256sum -c - \
+ && mkdir -p /out/opt/fex-rootfs \
+ && unsquashfs -q -no-xattrs -d /out/opt/fex-rootfs/x86 /tmp/rootfs.sqsh \
+ && rm /tmp/rootfs.sqsh
+
+# The tarball stays in the image so the entrypoint can unpack it into an
+# empty bind mount; the unpacked copy seeds named volumes.
+RUN mkdir -p /out/opt/steamcmd /steamcmd \
+ && curl -fsSL "$STEAMCMD_URL" -o /out/opt/steamcmd/steamcmd_linux.tar.gz \
+ && tar -xzf /out/opt/steamcmd/steamcmd_linux.tar.gz -C /steamcmd \
+ && test -x /steamcmd/steamcmd.sh
+
+# ---------------------------------------------------------------------------
+# runtime
+# ---------------------------------------------------------------------------
+FROM ubuntu:${UBUNTU_VERSION}
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install necessary dependencies
-RUN apt-get update && \
-    apt-get install -y \
-    git \
-    cmake \
-    ninja-build \
-    pkg-config \
-    ccache \
-    clang \
-    llvm \
-    lld \
-    binfmt-support \
-    libsdl2-dev \
-    libepoxy-dev \
-    libssl-dev \
-    python-setuptools \
-    g++-x86-64-linux-gnu \
-    nasm \
-    python3-clang \
-    libstdc++-10-dev-i386-cross \
-    libstdc++-10-dev-amd64-cross \
-    libstdc++-10-dev-arm64-cross \
-    squashfs-tools \
-    squashfuse \
-    libc-bin \
-    expect \
-    curl \
-    sudo \
-    fuse
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates libstdc++6 tini \
+ && rm -rf /var/lib/apt/lists/* \
+ # The base image ships an "ubuntu" user on uid 1000; give that uid to steam.
+ && userdel --remove ubuntu \
+ && useradd --create-home --uid 1000 --shell /bin/bash steam \
+ && install -d -o steam -g steam /data
 
-# Create a new user and set their home directory
-RUN useradd -m -s /bin/bash fex
+COPY --link --from=fetch /out/ /
+COPY --chown=1000:1000 --from=fetch /steamcmd /home/steam/steamcmd
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/entrypoint
+COPY --chmod=755 docker/fex-variant /usr/local/bin/fex-variant
 
-RUN usermod -aG sudo fex
+ENV FEX_ROOTFS=/opt/fex-rootfs/x86 \
+    STEAMCMD_DIR=/home/steam/steamcmd
 
-RUN echo "fex ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/fex
+# Numeric so `runAsNonRoot`-style checks can verify it without /etc/passwd.
+USER 1000:1000
+WORKDIR /home/steam
 
-USER fex
+LABEL org.opencontainers.image.title="steamcmd-arm64" \
+      org.opencontainers.image.description="SteamCMD on arm64 via the FEX x86 emulator" \
+      org.opencontainers.image.source="https://github.com/TeriyakiGod/steamcmd-docker-arm64"
 
-WORKDIR /home/fex
-
-# Clone the FEX repository and build it
-RUN git clone --recurse-submodules https://github.com/FEX-Emu/FEX.git && \
-    cd FEX && \
-    mkdir Build && \
-    cd Build && \
-    CC=clang CXX=clang++ cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DUSE_LINKER=lld -DENABLE_LTO=True -DBUILD_TESTS=False -DENABLE_ASSERTIONS=False -G Ninja .. && \
-    ninja
-
-WORKDIR /home/fex/FEX/Build
-
-RUN sudo ninja install && \
-    sudo ninja binfmt_misc_32 && \
-    sudo ninja binfmt_misc_64
-
-RUN sudo useradd -m -s /bin/bash steam
-
-RUN sudo apt install wget
-
-USER root
-
-RUN echo 'root:steamcmd' | chpasswd
-
-USER steam
-
-WORKDIR /home/steam/.fex-emu/RootFS/
-
-# Set up rootfs
-
-RUN wget -O Ubuntu_22_04.tar.gz https://www.dropbox.com/scl/fi/16mhn3jrwvzapdw50gt20/Ubuntu_22_04.tar.gz?rlkey=4m256iahwtcijkpzcv8abn7nf
-
-RUN tar xzf Ubuntu_22_04.tar.gz
-
-RUN rm ./Ubuntu_22_04.tar.gz
-
-WORKDIR /home/steam/.fex-emu
-
-RUN echo '{"Config":{"RootFS":"Ubuntu_22_04"}}' > ./Config.json
-
-WORKDIR /home/steam/Steam
-
-# Download and run SteamCMD
-RUN curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf -
-
-ENTRYPOINT FEXBash ./steamcmd.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint"]

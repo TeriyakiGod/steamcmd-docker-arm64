@@ -1,0 +1,4 @@
+ignored:
+  # Ubuntu drops superseded package versions from its mirrors, so pinned
+  # apt versions break the build within weeks. Base image tag pins the release.
+  - DL3008
