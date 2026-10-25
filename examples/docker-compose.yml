@@ -1,0 +1,60 @@
+# Example: install and run a Valheim dedicated server on an arm64 host.
+# Swap the app id, paths and launch command for your own game.
+#
+#   docker compose run --rm install    # download/update the server files
+#   docker compose up -d server        # start the server
+#   docker compose logs -f server
+#
+# The named volumes keep the game files, world saves and SteamCMD's own
+# updates across container rebuilds. Mount volumes at /data or
+# /home/steam/steamcmd: those exist in the image, owned by the steam user, so
+# Docker gives new volumes the right owner.
+
+services:
+  install:
+    image: teriyakigod/steamcmd:arm64
+    profiles: [tools]
+    command:
+      - +force_install_dir
+      - /data/valheim
+      - +login
+      - anonymous
+      - +app_update
+      - "896660"
+      - validate
+      - +quit
+    volumes:
+      - steamcmd:/home/steam/steamcmd
+      - games:/data
+
+  server:
+    image: teriyakigod/steamcmd:arm64
+    restart: unless-stopped
+    working_dir: /data/valheim
+    environment:
+      LD_LIBRARY_PATH: /data/valheim/linux64
+      SteamAppId: "892970"
+    # `fex` runs an x86-64 program through the emulator.
+    command:
+      - fex
+      - ./valheim_server.x86_64
+      - -nographics
+      - -batchmode
+      - -name
+      - My arm64 server
+      - -port
+      - "2456"
+      - -world
+      - Dedicated
+      - -password
+      - change-me-please
+      - -savedir
+      - /data/valheim-saves
+    ports:
+      - "2456-2457:2456-2457/udp"
+    volumes:
+      - games:/data
+
+volumes:
+  steamcmd:
+  games:

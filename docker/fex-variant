@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Print the fastest FEX build this CPU can run: armv8.0, armv8.2 or armv8.4.
+# Mirrors GetCPUFeaturesVersion() in FEX's Scripts/InstallFEX.py.
+#
+# Usage: fex-variant [cpuinfo-file]
+set -euo pipefail
+
+cpuinfo=${1:-/proc/cpuinfo}
+features=" $(awk -F: '/^Features/ { print $2; exit }' "$cpuinfo" | xargs) "
+
+has_all() {
+    local f
+    for f in "$@"; do
+        [[ $features == *" $f "* ]] || return 1
+    done
+}
+
+v8_1=(atomics asimdrdm crc32)
+v8_2=("${v8_1[@]}" dcpop)
+v8_3=("${v8_2[@]}" fcma jscvt lrcpc paca pacg)
+v8_4=("${v8_3[@]}" asimddp flagm ilrcpc uscat)
+
+if has_all "${v8_4[@]}"; then
+    echo armv8.4
+elif has_all "${v8_2[@]}"; then
+    # FEX ships one package for 8.2 and 8.3.
+    echo armv8.2
+else
+    echo armv8.0
+fi
